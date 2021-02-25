@@ -1,133 +1,124 @@
-import os
-import sys
-import requests
-import threading
+# requires feedparser, dateutils, urllib3, requests
 
-import defaults
-import database
+import sys
+
 import actions
 
-# python3 -B podcastd.py --list
-# python3 -B podcastd.py --update [--title title]*
-# python3 -B podcastd.py --add --link https://url [--title title] [--number N] [--folder /path/to/folder]
-# python3 -B podcastd.py --modify --title title [--new-title new-title] [--new-link https://new-url] [--new-number nN] [--new-folder /new/path/to/folder]
-# python3 -B podcastd.py --remove --title title
-
-if __name__ == "__main__":
-    db = database.connect(defaults.DATABASE, defaults.SQLCODE)
-    if db is None:
-        print("Error connecting to the database file!")
-        sys.exit(1)
-
+if __name__ == "__main__":    
     operations = []
+    parameter_for = None
+    value_for = None
 
-    i = 0
-    while i < len(sys.argv):
-        # new operations
-        if sys.argv[i] == "--list":
-            operations.append({"action": "list", "target": {}, "changes": {}})
+    for argument in sys.argv:
+        # operation starters
+        if argument == "--list-feed":
+            operations.append({})
+            operations[-1]["action"] = "list-feed"
+            
+        elif argument == "--add-feed":
+            operations.append({})
+            operations[-1]["action"] = "add-feed"
+            
+        elif argument == "--modify-feed":
+            operations.append({})
+            operations[-1]["action"] = "modify-feed"
+            
+        elif argument == "--remove-feed":
+            operations.append({})
+            operations[-1]["action"] = "remove-feed"
 
-        elif sys.argv[i] == "--update":
-            operations.append({"action": "update", "target": {}, "changes": {}})
+        elif argument == "--list-episode":
+            operations.append({})
+            operations[-1]["action"] = "list-episode"
+            
+        elif argument == "--add-episode":
+            operations.append({})
+            operations[-1]["action"] = "add-episode"
+            
+        elif argument == "--modify-episode":
+            operations.append({})
+            operations[-1]["action"] = "modify-episode"
+            
+        elif argument == "--remove-episode":
+            operations.append({})
+            operations[-1]["action"] = "remove-episode"
 
-        elif sys.argv[i] == "--add":
-            operations.append({"action": "add", "target": {}, "changes": {}})
+        elif argument == "--update-database":
+            operations.append({})
+            operations[-1]["action"] = "update-database"
 
-        elif sys.argv[i] == "--modify":
-            operations.append({"action": "modify", "target": {}, "changes": {}})
+        elif argument == "--download-files":
+            operations.append({})
+            operations[-1]["action"] = "download-files"
+            
+        # operation parameter selectors
+        elif argument == "--target":
+            operations[-1]["target"] = {}
+            parameter_for = "target"
+            
+        elif argument == "--changes":
+            operations[-1]["changes"] = {}
+            parameter_for = "changes"
+            
+        # operation value selectors
+        elif argument == "--title":
+            value_for = "title"
 
-        elif sys.argv[i] == "--remove":
-            operations.append({"action": "remove", "target": {}, "changes": {}})
+        elif argument == "--link":
+            value_for = "link"
 
-        elif sys.argv[i] == "--download":
-            operations.append({"action": "download", "target": {}, "changes": {}})
+        elif argument == "--number":
+            value_for = "number"
 
-        # target properties
-        elif sys.argv[i] == "--title":
-            if i + 1 < len(sys.argv):
-                operations[-1]["target"]["title"] = sys.argv[i + 1]
-            else:
-                print("No title specified!")
-                sys.exit(1)  
-            i += 1
+        elif argument == "--folder":
+            value_for = "folder"
 
-        elif sys.argv[i] == "--link":
-            if i + 1 < len(sys.argv):
-                operations[-1]["target"]["link"] = sys.argv[i + 1]
-            else:
-                print("No link specified!")
-                sys.exit(1)
-            i += 1
+        elif argument == "--feed":
+            value_for = "feed"
 
-        elif sys.argv[i] == "--number":
-            if i + 1 < len(sys.argv):
-                operations[-1]["target"]["number"] = sys.argv[i + 1]
-            else:
-                print("No number specified!")
-                sys.exit(1)
-            i += 1
+        elif argument == "--date":
+            value_for = "date"
 
-        elif sys.argv[i] == "--folder":
-            if i + 1 < len(sys.argv):
-                operations[-1]["target"]["folder"] = sys.argv[i + 1]
-            else:
-                print("No folder specified!")
-                sys.exit(1)
-            i += 1
+        elif argument == "--link":
+            value_for = "link"
 
-        # changes to target
-        elif sys.argv[i] == "--new-title":
-            if i + 1 < len(sys.argv):
-                operations[-1]["changes"]["title"] = sys.argv[i + 1]
-            else:
-                print("No title specified!")
-                sys.exit(1)
-            i += 1
+        elif argument == "--file":
+            value_for = "file"
 
-        elif sys.argv[i] == "--new-link":
-            if i + 1 < len(sys.argv):
-                operations[-1]["changes"]["link"] = sys.argv[i + 1]
-            else:
-                print("No link specified!")
-                sys.exit(1)
-            i += 1
-
-        elif sys.argv[i] == "--new-number":
-            if i + 1 < len(sys.argv):
-                operations[-1]["changes"]["number"] = sys.argv[i + 1]
-            else:
-                print("No number specified!")
-                sys.exit(1)
-            i += 1
-
-        elif sys.argv[i] == "--new-folder":
-            if i + 1 < len(sys.argv):
-                operations[-1]["changes"]["folder"] = sys.argv[i + 1]
-            else:
-                print("No folder specified!")
-                sys.exit(1)
-            i += 1
-
-        i += 1
-
-
+        # actual value
+        else:
+            if len(operations) > 0 and not parameter_for == None and not value_for == None:
+                operations[-1][parameter_for][value_for] = argument
+    
     for operation in operations:
-        # print(operation["action"], operation["target"], operation["changes"])
+        # print(operation)
 
-        if operation["action"] == "list":
-            actions.doList(db, operation["target"])
+        if operation["action"] == "list-feed":
+            actions.list_feed(operation["target"] if "target" in operation.keys() else {})
 
-        elif operation["action"] == "update":
-            actions.doUpdate(db, operation["target"])
+        elif operation["action"] == "add-feed":
+            actions.add_feed(operation["target"] if "target" in operation.keys() else {})
 
-        elif operation["action"] == "add":
-            actions.doAdd(db, operation["target"])
+        elif operation["action"] == "modify-feed":
+            actions.modify_feed(operation["target"] if "target" in operation.keys() else {}, operation["changes"] if "changes" in operation.keys() else {})
+        
+        elif operation["action"] == "remove-feed":
+            actions.remove_feed(operation["target"] if "target" in operation.keys() else {})        
 
-        elif operation["action"] == "modify":
-            actions.doModify(db, operation["target"], operation["changes"])
+        elif operation["action"] == "list-episode":
+            actions.list_episode(operation["target"] if "target" in operation.keys() else {})
 
-        elif operation["action"] == "remove":
-            actions.doRemove(db, operation["target"])
+        elif operation["action"] == "add-episode":
+            actions.add_episode(operation["target"] if "target" in operation.keys() else {})
 
-        elif operation["action"] == "download":
-            actions.doDownload(db, operation["target"])
+        elif operation["action"] == "modify-episode":
+            actions.modify_episode(operation["target"] if "target" in operation.keys() else {}, operation["changes"] if "changes" in operation.keys() else {})
+        
+        elif operation["action"] == "remove-episode":
+            actions.remove_episode(operation["target"] if "target" in operation.keys() else {})
+
+        elif operation["action"] == "update-database":
+            actions.update_database()
+
+        elif operation["action"] == "download-files":
+            actions.download_files_multithread()

@@ -1,24 +1,25 @@
+pragma foreign_keys = on;
+
 begin;
 
-create table if not exists "feed" (
-  "title" varchar (255) not null,
-  "link" varchar (255) not null,
-  "number" integer not null,
-  "folder" varchar (255) not null,
-
-  primary key ("title")
+create table if not exists 'feed' (
+    'title' text not null,
+    'link' text not null,
+    'number' integer not null,
+    'folder' text not null,
+    
+    primary key ('title')
 );
 
-create table if not exists "entry" (
-  "title" varchar (255) not null,
-  "feed" varchar (255) not null,
-  "date" integer not null,
-  "link" varchar (255) not null,
-  "file" varchar (255) not null,
-  "downloaded" varchar (255) not null check ("downloaded" in ("True", "False")),
-
-  primary key ("title", "feed"),
-  constraint "feed_of_entry" foreign key ("feed") references "feed" ("title")
+create table if not exists 'episode' (
+    'feed' text not null,
+    'title' text not null,
+    'date' text not null,
+    'link' text not null,
+    'file' text not null,
+    
+    constraint 'episode_has_feed' foreign key ('feed') references 'feed' ('title'),
+    primary key ('feed', 'title')
 );
 
 commit;

@@ -1,128 +1,238 @@
 import os
-import urllib.parse
-import requests
+import json
 import feedparser
+import requests
 import dateutil.parser
+import urllib.parse
+import subprocess
+import threading
 
-import defaults
 import database
+import config
 
-def doList(db, target):
-    if db is None or target is None:
-        return False
+def list_feed(target):
+    handle = database.connect(config.database_file, config.sql_file)
+
+    print(json.dumps(database.search_feed(handle, target), indent = 2))
+
+def add_feed(target):
+    handle = database.connect(config.database_file, config.sql_file)
+
+    # use defaults if not specified
+    if not "number" in target.keys():
+        target["number"] = config.default_number
+
+    if not "folder" in target.keys():
+        target["folder"] = os.path.join(config.default_root, target["title"])
+
+    database.add_feed(handle, target)
+
+def modify_feed(target, changes):
+    handle = database.connect(config.database_file, config.sql_file)
+
+    database.update_feed(handle, target, changes)
+
+def remove_feed(target):
+    handle = database.connect(config.database_file, config.sql_file)
+
+    database.remove_feed(handle, target)
+
+def list_episode(target):
+    handle = database.connect(config.database_file, config.sql_file)
+
+    print(json.dumps(database.search_episode(handle, target), indent = 2))
+
+def add_episode(target):
+    handle = database.connect(config.database_file, config.sql_file)
+
+    database.add_episode(handle, target)
+
+def modify_episode(target, changes):
+    handle = database.connect(config.database_file, config.sql_file)
+
+    database.update_episode(handle, target, changes)
+
+def remove_episode(target):
+    handle = database.connect(config.database_file, config.sql_file)
+
+    database.remove_episode(handle, target)
+
+def update_database():
+    handle = database.connect(config.database_file, config.sql_file)
+
+    feeds = database.search_feed(handle, {})
+    for feed in feeds:
+        rss = feedparser.parse(feed["link"])
+
+        for episode in rss["entries"]:
+            for link in episode["links"]:
+                if link["type"].startswith("audio"):
+                    database.add_episode(handle, {
+                        "feed": feed["title"],
+                        "title": episode["title"],
+                        "date": int(dateutil.parser.parse(episode["published"]).timestamp()),
+                        "link": link["href"],
+                        "file": "",
+                    })
+
+def download_files():
+    handle = database.connect(config.database_file, config.sql_file)
     
-    try:
-        if "title" in target.keys():
-            feeds = database.getSpecificFeed(db, target["title"])
-        else:
-            feeds = database.getFeeds(db)
+    feeds = database.search_feed(handle, {})
+    for feed in feeds:
+        os.makedirs(feed["folder"], exist_ok = True)
 
-        print(feeds)
-        return True
+        downloaded = 0
+        episodes = database.search_episode(handle, {"feed": feed["title"]})
+        for episode in episodes:
+            if os.path.isfile(episode["file"]):
+                downloaded += 1
 
-    except:
-        return False
+                if downloaded > feed["number"]:
+                    print(f"Removing old episode: {episode['title']}")
+                    os.remove(episode["file"])
+                    database.update_episode(handle, {
+                        "feed": feed["title"],
+                        "title": episode["title"]
+                    }, {
+                        "file": ""
+                    })
+                
+                else:
+                    print(f"Skipped downloaded episode: {episode['title']}")
 
-def doUpdate(db, target):
-    if db is None or target is None:
-        return False
+            elif downloaded < feed["number"]:
+                temp = os.path.join(config.temporary_root, "downloading" + os.path.splitext(urllib.parse.urlparse(episode["link"]).path)[1])
+                path = os.path.join(feed["folder"], episode["title"] + ".mp3")
 
-    try:
-        if "title" in target.keys():
-            feeds = database.getSpecificFeed(db, target["title"])
-        else:
-            feeds = database.getFeeds(db)
-            
-        for feed in feeds:
-            rss = feedparser.parse(feed["link"])
-            for entry in rss.entries:
-                for link in entry.links:
-                    if link.type.startswith("audio"):
-                        database.addEntry(db, entry.title, int(dateutil.parser.parse(entry.published).timestamp()), link.href, "", "False", feed["title"])
+                print(f"Downloading episode: {episode['title']}")
+                request = requests.get(episode["link"], allow_redirects = True, stream = True, headers = { "User-Agent" : "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36" })
+                request.raise_for_status()
+                with open(temp, "wb") as output:
+                    for chunck in request.iter_content(chunk_size = 1024 * 1024):
+                        if chunck:
+                            output.write(chunck)
 
-        return True
+                subprocess.run([
+                    "ffmpeg", "-n", "-nostdin", "-nostats", "-loglevel", "0",
+                    "-i", temp,
+                    "-codec:a", "libmp3lame",
+                    "-qscale:a", "6",
+                    path
+                ])
+                os.remove(temp)
 
-    except:
-        return False
+                database.update_episode(handle, {
+                    "feed": feed["title"],
+                    "title": episode["title"]
+                }, {
+                    "file": path
+                })
 
-def doAdd(db, target):
-    if db is None or target is None or not "link" in target.keys():
-        return False
+                downloaded += 1
 
-    try:
-        rss = feedparser.parse(target["link"])
-        database.addFeed(db, target["title"] if "title" in target.keys() else rss.feed.title, target["link"], target["number"] if "number" in target.keys() else defaults.NUMBER, target["folder"] if "folder" in target.keys() else os.path.join(defaults.FOLDER, rss.feed.title))
 
-        return True
+def download_files_multithread():
+    def run(id, size, lock, shared):
+        handle = database.connect(config.database_file, config.sql_file)
 
-    except:
-        return False
+        while True:
+            index = -1
+            with lock:
+                if shared["index"] < len(shared["episodes"]):
+                    index = shared["index"]
+                    shared["index"] += 1
 
-def doModify(db, target, changes):
-    if db is None or target is None or not "title" in target.keys():
-        return False
+                else:
+                    index = -1
 
-    try:
-        feed = database.getSpecificFeed(db, target["title"])
-        
-        database.updateFeed(db, changes["title"] if "title" in changes.keys() else feed[0]["title"], changes["link"] if "link" in changes.keys() else feed[0]["link"], changes["number"] if "number" in changes.keys() else feed[0]["number"], changes["folder"] if "folder" in changes.keys() else feed[0]["folder"], feed[0]["title"])
+            if index == -1:
+                break
 
-        return True
+            action = "ignore"
+            with lock:
+                if os.path.isfile(shared["episodes"][index]["file"]):
+                    shared["downloaded"] += 1
 
-    except:
-        return False
+                    if shared["downloaded"] > shared["feed"]["number"]:
+                        action = "remove"
 
-def doRemove(db, target):
-    if db is None or target is None or not "title" in target.keys():
-        return False
-
-    try:
-        database.deleteFeed(db, target["title"])
-
-        return True
-
-    except:
-        return False
-
-def doDownload(db, target):
-    if db is None or target is None:
-        return False
-    
-    try:
-        if "title" in target.keys():
-            feeds = database.getSpecificFeed(db, target["title"])
-        else:
-            feeds = database.getFeeds(db)
-
-        for feed in feeds:
-            if os.path.isdir(feed["folder"]) == False:
-                os.mkdir(feed["folder"])
-            
-            downloaded = 0
-            entries = database.getEntries(db, feed["title"])
-            for entry in entries:
-                if entry["downloaded"] == "True":
-                    downloaded += 1
-
-                    if downloaded > feed["number"] and feed["number"] != -1:
-                        print(f"Removing old episode: {entry['title']} ... ", end="")
-                        os.remove(entry["file"])
-                        database.updateEntry(db, entry["title"], entry["date"], entry["link"], "", "False", feed["title"], entry["title"], feed["title"])
-                        downloaded += -1
-                        print(f"Done!")
                     else:
-                        print(f"Skipped downloaded episode: {entry['title']}")
+                        action = "skip"
 
-                elif downloaded < feed["number"] or feed["number"] == -1:
-                    print(f"Downloading new episode: {entry['title']} ... ", end="")
-                    path = os.path.join(feed["folder"], entry["title"] + os.path.splitext(urllib.parse.urlparse(entry["link"]).path)[1])
-                    req = requests.get(entry["link"])
-                    open(path, "wb").write(req.content)
-                    database.updateEntry(db, entry["title"], entry["date"], entry["link"], path, "True", feed["title"], entry["title"], feed["title"])
-                    downloaded += 1
-                    print(f"Done!")
+                elif shared["downloaded"] < shared["feed"]["number"]:
+                    shared["downloaded"] += 1
+
+                    action = "download"
+
+            if action == "remove":
+                print(f"Removing old episode: {shared['episodes'][index]['title']}")
+
+                os.remove(shared["episodes"][index]["file"])
+                database.update_episode(handle, {
+                    "feed": shared["feed"]["title"],
+                    "title": shared["episodes"][index]["title"]
+                }, {
+                    "file": ""
+                })            
+
+            elif action == "download":
+                print(f"Downloading new episode: {shared['episodes'][index]['title']}")
+
+                temp = os.path.join(config.temporary_root, "podcastd_temp_thread" + str(id) + os.path.splitext(urllib.parse.urlparse(shared["episodes"][index]["link"]).path)[1])
+                path = os.path.join(shared["feed"]["folder"], shared["episodes"][index]["title"] + ".mp3")
+
+                request = requests.get(shared["episodes"][index]["link"], allow_redirects = True, stream = True, headers = { "User-Agent" : "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36" })
+                request.raise_for_status()
+                with open(temp, "wb") as output:
+                    for chunck in request.iter_content(chunk_size = 1024 * 1024):
+                        if chunck:
+                            output.write(chunck)
+
+                subprocess.run([
+                    "ffmpeg", "-n", "-nostdin", "-nostats", "-loglevel", "0",
+                    "-i", temp,
+                    "-codec:a", "libmp3lame",
+                    "-qscale:a", "6",
+                    path
+                ])
+                os.remove(temp)
+
+                database.update_episode(handle, {
+                    "feed": shared["feed"]["title"],
+                    "title": shared["episodes"][index]["title"]
+                }, {
+                    "file": path
+                })
+
+            elif action == "skip":
+                print(f"Skipping downloaded episode: {shared['episodes'][index]['title']}")
+
+            # else:
+            #     print(f"Ignoring episode: {shared['episodes'][index]['title']}")
+
+    
+    handle = database.connect(config.database_file, config.sql_file)
+    
+    feeds = database.search_feed(handle, {})
+    for feed in feeds:
+        os.makedirs(feed["folder"], exist_ok = True)
+
+        lock = threading.Lock()
+        threads = []
+        shared = {
+            "index": 0,
+            "downloaded": 0,
+            "feed": feed,
+            "episodes": database.search_episode(handle, {"feed": feed["title"]})
+        }
+
+        for i in range(0, config.thread_count):
+            threads.append(threading.Thread(target = run, args = (i, config.thread_count, lock, shared, )))
+
+        for thread in threads:
+            thread.start()
+
+        for thread in threads:
+            thread.join()        
         
-        return True
-
-    except:
-        return False
