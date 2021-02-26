@@ -1,6 +1,6 @@
 default_number = 1
-default_root = "podcasts"
+default_root = "/tmp/podcasts"
 database_file = "database.db"
-sql_file = "database.sql"
+database_code = "database.sql"
 temporary_root = "/tmp"
 thread_count = 2

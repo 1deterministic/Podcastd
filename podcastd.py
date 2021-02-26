@@ -1,10 +1,9 @@
 # requires feedparser, dateutils, urllib3, requests
-
 import sys
 
 import actions
 
-if __name__ == "__main__":    
+if __name__ == "__main__":
     operations = []
     parameter_for = None
     value_for = None
@@ -94,31 +93,72 @@ if __name__ == "__main__":
         # print(operation)
 
         if operation["action"] == "list-feed":
-            actions.list_feed(operation["target"] if "target" in operation.keys() else {})
+            if actions.list_feed(operation["target"] if "target" in operation.keys() else {}):
+                print("Success!")
+
+            else:
+                print("Error!")
 
         elif operation["action"] == "add-feed":
-            actions.add_feed(operation["target"] if "target" in operation.keys() else {})
+            if actions.add_feed(operation["target"] if "target" in operation.keys() else {}):
+                print("Success!")
+                
+            else:
+                print("Error!")
 
         elif operation["action"] == "modify-feed":
-            actions.modify_feed(operation["target"] if "target" in operation.keys() else {}, operation["changes"] if "changes" in operation.keys() else {})
+            if actions.modify_feed(operation["target"] if "target" in operation.keys() else {}, operation["changes"] if "changes" in operation.keys() else {}):
+                print("Success!")
+                
+            else:
+                print("Error!")
         
         elif operation["action"] == "remove-feed":
-            actions.remove_feed(operation["target"] if "target" in operation.keys() else {})        
+            if actions.remove_feed(operation["target"] if "target" in operation.keys() else {})        :
+                print("Success!")
+                
+            else:
+                print("Error!")
 
         elif operation["action"] == "list-episode":
-            actions.list_episode(operation["target"] if "target" in operation.keys() else {})
+            if actions.list_episode(operation["target"] if "target" in operation.keys() else {}):
+                print("Success!")
+                
+            else:
+                print("Error!")
 
         elif operation["action"] == "add-episode":
-            actions.add_episode(operation["target"] if "target" in operation.keys() else {})
+            if actions.add_episode(operation["target"] if "target" in operation.keys() else {}):
+                print("Success!")
+                
+            else:
+                print("Error!")
 
         elif operation["action"] == "modify-episode":
-            actions.modify_episode(operation["target"] if "target" in operation.keys() else {}, operation["changes"] if "changes" in operation.keys() else {})
+            if actions.modify_episode(operation["target"] if "target" in operation.keys() else {}, operation["changes"] if "changes" in operation.keys() else {}):
+                print("Success!")
+                
+            else:
+                print("Error!")
         
         elif operation["action"] == "remove-episode":
-            actions.remove_episode(operation["target"] if "target" in operation.keys() else {})
+            if actions.remove_episode(operation["target"] if "target" in operation.keys() else {}):
+                print("Success!")
+                
+            else:
+                print("Error!")
 
         elif operation["action"] == "update-database":
-            actions.update_database()
+            if actions.update_database():
+                print("Success!")
+                
+            else:
+                print("Error!")
 
         elif operation["action"] == "download-files":
-            actions.download_files_multithread()
+            # if actions.download_files_multithread():
+            if actions.download_files():
+                print("Success!")
+                
+            else:
+                print("Error!")

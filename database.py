@@ -1,257 +1,354 @@
 import sqlite3
 
-path = "database.db"
-code = "database.sql"
+import config
 
-def connect(path, code):
-    handle = sqlite3.connect(path)
-    handle.cursor().executescript(open(code, "r").read())
-    handle.commit()
+def connect():
+    try:
+        handle = sqlite3.connect(config.database_file)
+        handle.cursor().executescript(open(config.database_code, "r").read())
+        handle.commit()
 
-    return handle
-
-
-def add_feed(handle, target):
-    handle.cursor().execute("insert or ignore into 'feed' (title, link, number, folder) values (?, ?, ?, ?);", (target["title"], target["link"], target["number"], target["folder"], ))
-    return handle.commit()
-
-
-def get_feed(handle, target):
-    results = []
-
-    for row in handle.cursor().execute("select * from 'feed' where title = ?;", (target["title"], )).fetchall():
-        results.append({
-            "title": row[0],
-            "link": row[1],
-            "number": row[2],
-            "folder": row[3]
-        })
+        return handle
     
-    return results
+    except:
+        return None
 
 
-def search_feed(handle, target):
-    conditions = ""
-    values = []
+def add_feed(target):
+    try:
+        handle = connect()
+        if handle == None:
+            return False
 
-    if len(target.keys()) > 0:
-        conditions = " where"
-        first = True
+        handle.cursor().execute("insert or ignore into 'feed' (title, link, number, folder) values (?, ?, ?, ?);", (target["title"], target["link"], target["number"], target["folder"], ))
+        handle.commit()
 
-        for key in target.keys():
-            if not first:
-                conditions += " and"
+        return True
 
-            conditions += f" {key} = ?"
-            values.append(target[key])
+    except:
+        return False
 
-            first = False
 
-    results = []
+def get_feed(target):
+    try:
+        handle = connect()
+        if handle == None:
+            return []
 
-    for row in handle.cursor().execute(f"select * from 'feed'{conditions} order by title desc;", (* values, )).fetchall():
-        results.append({
-            "title": row[0],
-            "link": row[1],
-            "number": row[2],
-            "folder": row[3]
-        })
+        results = []
+        for row in handle.cursor().execute("select * from 'feed' where title = ?;", (target["title"], )).fetchall():
+            results.append({
+                "title": row[0],
+                "link": row[1],
+                "number": row[2],
+                "folder": row[3]
+            })
+
+        return results
+
+    except:
+        return []
+
+
+def search_feed(target):
+    try:
+        handle = connect()
+        if handle == None:
+            return []
+
+        conditions = ""
+        values = []
+        if len(target.keys()) > 0:
+            conditions = " where"
+            first = True
+
+            for key in target.keys():
+                if not first:
+                    conditions += " and"
+
+                conditions += f" {key} = ?"
+                values.append(target[key])
+
+                first = False
+
+        results = []
+        for row in handle.cursor().execute(f"select * from 'feed'{conditions} order by title desc;", (* values, )).fetchall():
+            results.append({
+                "title": row[0],
+                "link": row[1],
+                "number": row[2],
+                "folder": row[3]
+            })
+        
+        return results
+
+    except:
+        return []
+
+
+def find_feed(target):
+    try:
+        handle = connect()
+        if handle == None:
+            return []
+
+        conditions = ""
+        values = []
+        if len(target.keys()) > 0:
+            conditions = " where"
+            first = True
+
+            for key in target.keys():
+                if not first:
+                    conditions += " or"
+
+                conditions += f" {key} = ?"
+                values.append(target[key])
+
+                first = False
+
+        results = []
+        for row in handle.cursor().execute(f"select * from 'feed'{conditions} order by title desc;", (* values, )).fetchall():
+            results.append({
+                "title": row[0],
+                "link": row[1],
+                "number": row[2],
+                "folder": row[3]
+            })
+        
+        return results
+
+    except:
+        return []
+
+
+def update_feed(target, changes):
+    try:
+        handle = connect()
+        if handle == None:
+            return False
+
+        conditions = ""
+        values = []
+        if len(target.keys()) > 0:
+            conditions = " where"
+            first = True
+
+            for key in target.keys():
+                if not first:
+                    conditions += " and"
+
+                conditions += f" {key} = ?"
+                values.append(target[key])
+
+                first = False
+
+        fields = ""
+        new_values = []
+        if len(changes.keys()) > 0:
+            fields = " set"
+            first = True
+
+            for key in changes.keys():
+                if not first:
+                    fields += ","
+
+                fields += f" {key} = ?"
+                new_values.append(changes[key])
+
+                first = False
+
+        handle.cursor().execute(f"update 'feed'{fields}{conditions};", (* new_values, * values, ))
+        handle.commit()
+
+        return True
     
-    return results
+    except:
+        return False
 
 
-def find_feed(handle, target):
-    conditions = ""
-    values = []
+def remove_feed(target):
+    try:
+        handle = connect()
+        if handle == None:
+            return False
 
-    if len(target.keys()) > 0:
-        conditions = " where"
-        first = True
+        # handle.cursor().execute("delete from 'episode' where feed = ?;", (target["title"], ))
+        handle.cursor().execute("delete from 'feed' where title = ?;", (target["title"], ))
+        handle.commit()
 
-        for key in target.keys():
-            if not first:
-                conditions += " or"
-
-            conditions += f" {key} = ?"
-            values.append(target[key])
-
-            first = False
-
-    results = []
-
-    for row in handle.cursor().execute(f"select * from 'feed'{conditions} order by title desc;", (* values, )).fetchall():
-        results.append({
-            "title": row[0],
-            "link": row[1],
-            "number": row[2],
-            "folder": row[3]
-        })
+        return True
     
-    return results
+    except:
+        return False
 
 
-def update_feed(handle, target, changes):
-    conditions = ""
-    values = []
+def add_episode(target):
+    try:
+        handle = connect()
+        if handle == None:
+            return False
 
-    if len(target.keys()) > 0:
-        conditions = " where"
-        first = True
+        handle.cursor().execute("insert or ignore into 'episode' (feed, title, date, link, file) values (?, ?, ?, ?, ?);", (target["feed"], target["title"], target["date"], target["link"], target["file"], ))
+        handle.commit()
 
-        for key in target.keys():
-            if not first:
-                conditions += " and"
-
-            conditions += f" {key} = ?"
-            values.append(target[key])
-
-            first = False
-
-    fields = ""
-    new_values = []
-
-    if len(changes.keys()) > 0:
-        fields = " set"
-        first = True
-
-        for key in changes.keys():
-            if not first:
-                fields += ","
-
-            fields += f" {key} = ?"
-            new_values.append(changes[key])
-
-            first = False
-
-    handle.cursor().execute(f"update 'feed'{fields}{conditions};", (* new_values, * values, ))
-    return handle.commit()
-
-
-def remove_feed(handle, target):
-    # handle.cursor().execute("delete from 'episode' where feed = ?;", (target["title"], ))
-    handle.cursor().execute("delete from 'feed' where title = ?;", (target["title"], ))
-    return handle.commit()
-
-
-def add_episode(handle, target):
-    handle.cursor().execute("insert or ignore into 'episode' (feed, title, date, link, file) values (?, ?, ?, ?, ?);", (target["feed"], target["title"], target["date"], target["link"], target["file"], ))
-    return handle.commit()
-
-
-def get_episode(handle, target):
-    results = []
-
-    for row in handle.cursor().execute("select * from 'episode' where feed = ? and title = ?;", (taget["feed"], target["title"], )).fetchall():
-        results.append({
-            "feed": row[0],
-            "title": row[1],
-            "date": row[2],
-            "link": row[3],
-            "file": row[4]
-        })
+        return True
     
-    return results
+    except:
+        return False
 
 
-def search_episode(handle, target):
-    conditions = ""
-    values = []
+def get_episode(target):
+    try:
+        handle = connect()
+        if handle == None:
+            return []
 
-    if len(target.keys()) > 0:
-        conditions = " where"
-        first = True
+        results = []
+        for row in handle.cursor().execute("select * from 'episode' where feed = ? and title = ?;", (taget["feed"], target["title"], )).fetchall():
+            results.append({
+                "feed": row[0],
+                "title": row[1],
+                "date": row[2],
+                "link": row[3],
+                "file": row[4]
+            })
+        
+        return results
 
-        for key in target.keys():
-            if not first:
-                conditions += " and"
+    except:
+        return []
 
-            conditions += f" {key} = ?"
-            values.append(target[key])
 
-            first = False
+def search_episode(target):
+    try:
+        handle = connect()
+        if handle == None:
+            return []
 
-    results = []
+        conditions = ""
+        values = []
+        if len(target.keys()) > 0:
+            conditions = " where"
+            first = True
 
-    for row in handle.cursor().execute(f"select * from 'episode'{conditions} order by date desc;", (* values, )).fetchall():
-        results.append({
-            "feed": row[0],
-            "title": row[1],
-            "date": row[2],
-            "link": row[3],
-            "file": row[4]
-        })
+            for key in target.keys():
+                if not first:
+                    conditions += " and"
+
+                conditions += f" {key} = ?"
+                values.append(target[key])
+
+                first = False
+
+        results = []
+        for row in handle.cursor().execute(f"select * from 'episode'{conditions} order by date desc;", (* values, )).fetchall():
+            results.append({
+                "feed": row[0],
+                "title": row[1],
+                "date": row[2],
+                "link": row[3],
+                "file": row[4]
+            })
+        
+        return results
+
+    except:
+        return []
+
+
+def find_episode(target):
+    try:
+        handle = connect()
+        if handle == None:
+            return []
+            
+        conditions = ""
+        values = []
+        if len(target.keys()) > 0:
+            conditions = " where"
+            first = True
+
+            for key in target.keys():
+                if not first:
+                    conditions += " or"
+
+                conditions += f" {key} = ?"
+                values.append(target[key])
+
+                first = False
+
+        results = []
+        for row in handle.cursor().execute(f"select * from 'episode'{conditions} order by date desc;", (* values, )).fetchall():
+            results.append({
+                "feed": row[0],
+                "title": row[1],
+                "date": row[2],
+                "link": row[3],
+                "file": row[4]
+            })
+        
+        return results
     
-    return results
+    except:
+        return []
 
 
-def find_episode(handle, target):
-    conditions = ""
-    values = []
+def update_episode(target, changes):
+    try:
+        handle = connect()
+        if handle == None:
+            return False
 
-    if len(target.keys()) > 0:
-        conditions = " where"
-        first = True
+        conditions = ""
+        values = []
+        if len(target.keys()) > 0:
+            conditions = " where"
+            first = True
 
-        for key in target.keys():
-            if not first:
-                conditions += " or"
+            for key in target.keys():
+                if not first:
+                    conditions += " and"
 
-            conditions += f" {key} = ?"
-            values.append(target[key])
+                conditions += f" {key} = ?"
+                values.append(target[key])
 
-            first = False
+                first = False
 
-    results = []
+        fields = ""
+        new_values = []
+        if len(changes.keys()) > 0:
+            fields = " set"
+            first = True
 
-    for row in handle.cursor().execute(f"select * from 'episode'{conditions} order by date desc;", (* values, )).fetchall():
-        results.append({
-            "feed": row[0],
-            "title": row[1],
-            "date": row[2],
-            "link": row[3],
-            "file": row[4]
-        })
+            for key in changes.keys():
+                if not first:
+                    fields += ","
+
+                fields += f" {key} = ?"
+                new_values.append(changes[key])
+
+                first = False
+
+        handle.cursor().execute(f"update 'episode'{fields}{conditions};", (* new_values, * values, ))
+        handle.commit()
+
+        return True
+
+    except:
+        return False
+
+
+def remove_episode(target):
+    try:
+        handle = connect()
+        if handle == None:
+            return False
+
+        handle.cursor().execute("delete from 'episode' where feed = ? and title = ?;", (target["feed"], target["title"], ))
+        handle.commit()
+
+        return True
     
-    return results
-
-
-def update_episode(handle, target, changes):
-    conditions = ""
-    values = []
-
-    if len(target.keys()) > 0:
-        conditions = " where"
-        first = True
-
-        for key in target.keys():
-            if not first:
-                conditions += " and"
-
-            conditions += f" {key} = ?"
-            values.append(target[key])
-
-            first = False
-
-    fields = ""
-    new_values = []
-
-    if len(changes.keys()) > 0:
-        fields = " set"
-        first = True
-
-        for key in changes.keys():
-            if not first:
-                fields += ","
-
-            fields += f" {key} = ?"
-            new_values.append(changes[key])
-
-            first = False
-
-    handle.cursor().execute(f"update 'episode'{fields}{conditions};", (* new_values, * values, ))
-    return handle.commit()
-
-
-def remove_episode(handle, target):
-    handle.cursor().execute("delete from 'episode' where feed = ? and title = ?;", (target["feed"], target["title"], ))
-    return handle.commit()
+    except:
+        return False
