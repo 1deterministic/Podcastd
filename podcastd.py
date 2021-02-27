@@ -156,8 +156,8 @@ if __name__ == "__main__":
                 print("Error!")
 
         elif operation["action"] == "download-files":
-            # if actions.download_files_multithread():
-            if actions.download_files():
+            if actions.download_files_multithread():
+            # if actions.download_files():
                 print("Success!")
                 
             else:

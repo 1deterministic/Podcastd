@@ -121,6 +121,8 @@ def download_files():
             elif action == "download":
                 print(f"Downloading new episode: {episode['title']}")
 
+                os.makedirs(config.temporary_root, exist_ok = True)
+
                 temp = os.path.join(config.temporary_root, "podcastd_temp" + os.path.splitext(urllib.parse.urlparse(episode["link"]).path)[1])
                 path = os.path.join(feed["folder"], episode["title"] + ".mp3")
 
@@ -222,6 +224,8 @@ def download_files_multithread():
             elif action == "download":
                 print(f"Downloading new episode: {shared['episodes'][index]['title']}")
 
+                os.makedirs(config.temporary_root, exist_ok = True)
+                
                 temp = os.path.join(config.temporary_root, "podcastd_temp_thread" + str(id) + os.path.splitext(urllib.parse.urlparse(shared["episodes"][index]["link"]).path)[1])
                 path = os.path.join(shared["feed"]["folder"], shared["episodes"][index]["title"] + ".mp3")
 
