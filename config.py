@@ -1,18 +1,24 @@
 import os
 import sys
 import json
+import subprocess
+
+def terminal(command):
+    return subprocess.check_output(command).decode("utf-8").replace("\n", "")    
+
+user_dir = terminal(["xdg-user-dir", "HOME"])
+config_dir = os.path.join(user_dir, ".config", "podcastd")
+cache_dir = os.path.join(user_dir, ".cache", "podcastd")
 
 # these cannot be changed with the config file
-user_dir = os.path.expanduser("~")
-config_dir = os.path.join(user_dir, ".config", "podcastd")
 config_file = os.path.join(config_dir, "config.json")
 database_code = os.path.join(sys.path[0], "database.sql")
 
 # these are configurable
 default_number = 1
-default_root = os.path.join(user_dir, "Downloads")
+default_root = terminal(["xdg-user-dir", "DOWNLOAD"])
 database_file = os.path.join(config_dir, "database.sqlite3")
-temporary_root = os.path.join(user_dir, ".cache", "podcastd")
+temporary_root = cache_dir
 thread_count = os.cpu_count()
 
 # create the config folder if doesn't exist yet
