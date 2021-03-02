@@ -6,6 +6,7 @@ import dateutil.parser
 import urllib.parse
 import subprocess
 import threading
+import re
 
 import database
 import config
@@ -123,13 +124,18 @@ def download_files():
 
                 os.makedirs(config.temporary_root, exist_ok = True)
 
-                temp = os.path.join(config.temporary_root, "podcastd_temp" + os.path.splitext(urllib.parse.urlparse(episode["link"]).path)[1])
-                path = os.path.join(feed["folder"], episode["title"] + ".mp3")
+                downloaded_file = os.path.join(config.temporary_root, "podcastd_temp" + os.path.splitext(urllib.parse.urlparse(episode["link"]).path)[1])
+                output_file = subprocess.check_output(f"echo {re.search('::(.*)::', config.copy_command).group(1)}", shell = True, env = {
+                    **os.environ,
+                    "downloaded_file": downloaded_file,
+                    "feed_title": feed['title'],
+                    "feed_folder": feed['folder'],
+                    "episode_title": episode['title']
+                }).decode("utf-8").replace("\n", "")
 
                 try:
                     request = requests.get(episode["link"], timeout = 10, allow_redirects = True, stream = True, headers = { "User-Agent" : "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36" })
-                    # request.raise_for_status()
-                    with open(temp, "wb") as output:
+                    with open(downloaded_file, "wb") as output:
                         for chunck in request.iter_content(chunk_size = 1024 * 1024):
                             if chunck:
                                 output.write(chunck)
@@ -138,27 +144,26 @@ def download_files():
                     print(f"Error: Could not download file from: {episode['link']}")
                     continue
 
-
-                subprocess.run([
-                    "ffmpeg", "-n", "-nostdin", "-nostats", "-loglevel", "0",
-                    "-i", temp,
-                    "-codec:a", "libmp3lame",
-                    "-qscale:a", "6",
-                    path
-                ])
+                subprocess.run(config.copy_command.replace("::", ""), shell = True, env = {
+                    **os.environ,
+                    "downloaded_file": downloaded_file,
+                    "feed_title": feed['title'],
+                    "feed_folder": feed['folder'],
+                    "episode_title": episode['title']
+                })
 
                 try:
-                    os.remove(temp)
+                    os.remove(downloaded_file)
                 
                 except:
-                    print(f"Error: Could not remove temporary file: {temp}")
+                    print(f"Error: Could not remove temporary file: {downloaded_file}")
                     continue
 
                 if not database.update_episode({
                     "feed": feed["title"],
                     "title": episode["title"]
                 }, {
-                    "file": path
+                    "file": output_file
                 }):
                     print(f"Error: Could not update database to include file reference: {episode['file']}")
                     continue
@@ -226,13 +231,18 @@ def download_files_multithread():
 
                 os.makedirs(config.temporary_root, exist_ok = True)
                 
-                temp = os.path.join(config.temporary_root, "podcastd_temp_thread" + str(id) + os.path.splitext(urllib.parse.urlparse(shared["episodes"][index]["link"]).path)[1])
-                path = os.path.join(shared["feed"]["folder"], shared["episodes"][index]["title"] + ".mp3")
+                downloaded_file = os.path.join(config.temporary_root, "podcastd_temp_thread" + str(id) + os.path.splitext(urllib.parse.urlparse(shared["episodes"][index]["link"]).path)[1])
+                output_file = subprocess.check_output(f"echo {re.search('::(.*)::', config.copy_command).group(1)}", shell = True, env = {
+                    **os.environ,
+                    "downloaded_file": downloaded_file,
+                    "feed_title": shared['feed']['title'],
+                    "feed_folder": shared['feed']['folder'],
+                    "episode_title": shared['episodes'][index]['title']
+                }).decode("utf-8").replace("\n", "")
 
                 try:
                     request = requests.get(shared["episodes"][index]["link"], timeout = 10, allow_redirects = True, stream = True, headers = { "User-Agent" : "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36" })
-                    # request.raise_for_status()
-                    with open(temp, "wb") as output:
+                    with open(downloaded_file, "wb") as output:
                         for chunck in request.iter_content(chunk_size = 1024 * 1024):
                             if chunck:
                                 output.write(chunck)
@@ -241,26 +251,26 @@ def download_files_multithread():
                     print(f"Error: Could not download file from: {shared['episodes'][index]['link']}")
                     continue
 
-                subprocess.run([
-                    "ffmpeg", "-n", "-nostdin", "-nostats", "-loglevel", "0",
-                    "-i", temp,
-                    "-codec:a", "libmp3lame",
-                    "-qscale:a", "6",
-                    path
-                ])
+                subprocess.run(config.copy_command.replace("::", ""), shell = True, env = {
+                    **os.environ,
+                    "downloaded_file": downloaded_file,
+                    "feed_title": shared['feed']['title'],
+                    "feed_folder": shared['feed']['folder'],
+                    "episode_title": shared['episodes'][index]['title']
+                })
 
                 try:
-                    os.remove(temp)
+                    os.remove(downloaded_file)
 
                 except:
-                    print(f"Error: Could not remove temporary file: {temp}")
+                    print(f"Error: Could not remove temporary file: {downloaded_file}")
                     continue
 
                 if not database.update_episode({
                     "feed": shared["feed"]["title"],
                     "title": shared["episodes"][index]["title"]
                 }, {
-                    "file": path
+                    "file": output_file
                 }):
                     print(f"Error: Could not update database to include file reference: {shared['episodes'][index]['file']}")
                     continue
