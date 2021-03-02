@@ -35,7 +35,7 @@ if not os.path.isfile(config_file):
     }, indent = 2))
 
 # load the config file
-settings = json.loads(open(os.path.expanduser(config_file)).read())
+settings = json.loads(open(config_file).read())
     
 if "default_number" in settings.keys():
     default_number = settings["default_number"]
