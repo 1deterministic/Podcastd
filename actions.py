@@ -308,4 +308,4 @@ def download_files_multithread():
         for thread in threads:
             thread.join()
 
-        return True
+    return True
